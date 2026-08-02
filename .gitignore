@@ -1,0 +1,26 @@
+__pycache__/
+*.py[cod]
+.venv/
+.env
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.ruff_cache/
+
+# uv
+uv.lock.bak
+
+# local models / caches
+.cache/
+*.wav
+*.mp3
+*.mp4
+*.mov
+
+# sample data (user-supplied, not committed)
+samples/
+tests/fixtures/*.wav
+tests/fixtures/*.mp4
+
+.DS_Store
