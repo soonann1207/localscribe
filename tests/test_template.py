@@ -16,3 +16,8 @@ def test_parse_fields_ignores_non_heading_hashes(tmp_path):
     template = tmp_path / "template.md"
     template.write_text("## Notes\n\nUse #hashtags here, not a heading.\n")
     assert parse_fields(template) == ["Notes"]
+
+def test_parse_fields_empty_for_no_headings(tmp_path):
+    template = tmp_path / "template.md"
+    template.write_text("Just plain text, no ATX headings here.\n")
+    assert parse_fields(template) == []
