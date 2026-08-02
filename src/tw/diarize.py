@@ -12,6 +12,6 @@ def _segments_from_annotation(annotation) -> list[SpeakerSegment]:
 def diarize(audio_path: Path, hf_token: str) -> list[SpeakerSegment]:
     from pyannote.audio import Pipeline
 
-    pipeline = Pipeline.from_pretrained("pyannote/speaker-diarization-3.1", use_auth_token=hf_token)
-    annotation = pipeline(str(audio_path))
-    return _segments_from_annotation(annotation)
+    pipeline = Pipeline.from_pretrained("pyannote/speaker-diarization-3.1", token=hf_token)
+    output = pipeline(str(audio_path))
+    return _segments_from_annotation(output.speaker_diarization)
