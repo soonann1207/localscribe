@@ -11,26 +11,26 @@ for whatever template the situation calls for.
 
 ## Status
 
-Pre-implementation. See:
+v1 pipeline implemented (11/11 tasks complete), pending real-world integration test. See:
 - [PRD](Local%20Meeting%20Summarizer%20-%20PRD.md) — requirements, scope, architecture
 - [Design spec](docs/superpowers/specs/2026-08-02-local-transcript-autofill-design.md) — module breakdown, implementation decisions
 
 ## Stack
 
-ffmpeg · faster-whisper · pyannote.audio · Ollama (Llama 3.3 8B) · uv
+ffmpeg · faster-whisper · pyannote.audio · Ollama (Llama 3.1 8B) · uv
 
 ## Setup
 
 ```bash
 brew install ffmpeg
-uv sync
+uv sync --extra dev
 ```
 
-Requires a local Ollama install with `llama3.3` pulled, and a HuggingFace
+Requires a local Ollama install with `llama3.1:8b` pulled, and a HuggingFace
 token with pyannote's gated model license accepted (see design spec, M2).
 
 ## Usage
 
 ```bash
-uv run python -m tw --video recording.mp4 --template template.md
+uv run python -m tw.cli --video recording.mp4 --template template.md
 ```
