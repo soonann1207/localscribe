@@ -12,7 +12,7 @@ def align(transcript: list[TranscriptSegment], speakers: list[SpeakerSegment]) -
         best_overlap = 0.0
         for spk in speakers:
             ov = _overlap(seg.start, seg.end, spk.start, spk.end)
-            if ov > best_overlap:
+            if ov > best_overlap:  # strictly greater: first speaker wins ties
                 best_overlap = ov
                 best_speaker = spk.speaker
         labeled.append(LabeledSegment(start=seg.start, end=seg.end, speaker=best_speaker, text=seg.text))
