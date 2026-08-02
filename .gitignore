@@ -24,3 +24,6 @@ tests/fixtures/*.wav
 tests/fixtures/*.mp4
 
 .DS_Store
+
+# worktrees (superpowers:using-git-worktrees)
+.worktrees/
