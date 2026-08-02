@@ -1,4 +1,5 @@
 import argparse
+import os
 import shutil
 import subprocess
 import sys
@@ -20,8 +21,12 @@ def preflight_check() -> list[str]:
         problems.append("ollama not found on PATH")
     else:
         result = subprocess.run(["ollama", "list"], capture_output=True, text=True)
-        if "llama3.3" not in result.stdout:
-            problems.append("llama3.3 model not pulled (ollama pull llama3.3)")
+        if "llama3.1:8b" not in result.stdout:
+            problems.append("llama3.1:8b model not pulled (ollama pull llama3.1:8b)")
+    if not os.environ.get("HF_TOKEN"):
+        problems.append(
+            "HF_TOKEN not set (required for pyannote diarization — see design spec Task 8 setup notes)"
+        )
     return problems
 
 

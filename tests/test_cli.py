@@ -18,7 +18,20 @@ def test_preflight_check_passes_when_tools_and_model_present(monkeypatch):
     monkeypatch.setattr("shutil.which", lambda name: f"/usr/bin/{name}")
 
     class FakeResult:
-        stdout = "llama3.3:latest\n"
+        stdout = "llama3.1:8b:latest\n"
 
     monkeypatch.setattr("subprocess.run", lambda *a, **k: FakeResult())
+    monkeypatch.setenv("HF_TOKEN", "fake-token")
     assert preflight_check() == []
+
+
+def test_preflight_check_flags_missing_hf_token(monkeypatch):
+    monkeypatch.setattr("shutil.which", lambda name: f"/usr/bin/{name}")
+
+    class FakeResult:
+        stdout = "llama3.1:8b:latest\n"
+
+    monkeypatch.setattr("subprocess.run", lambda *a, **k: FakeResult())
+    monkeypatch.delenv("HF_TOKEN", raising=False)
+    problems = preflight_check()
+    assert any("HF_TOKEN" in p for p in problems)

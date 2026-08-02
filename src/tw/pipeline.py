@@ -11,13 +11,16 @@ from tw.transcribe import transcribe
 
 
 def run(video_path: Path, template_path: Path) -> Path:
+    fields = parse_fields(template_path)
+    if not fields:
+        raise ValueError(f"template has no headings/fields: {template_path}")
+
     audio_path = extract_audio(video_path)
     transcript = transcribe(audio_path)
     speakers = diarize(audio_path, os.environ["HF_TOKEN"])
     labeled = align(transcript, speakers)
     labeled_text = "\n".join(f"[{seg.speaker}] {seg.text}" for seg in labeled)
 
-    fields = parse_fields(template_path)
     result = extract_fields(labeled_text, fields, call_model=call_ollama)
 
     output_text = assemble(template_path, result.filled, result.failed_fields)
