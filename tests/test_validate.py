@@ -20,3 +20,9 @@ def test_validate_reports_invalid_non_string_fields():
     assert result.ok is False
     assert result.missing == []
     assert result.invalid == ["Decisions"]
+
+
+def test_validate_reports_blank_string_as_invalid():
+    result = validate({"Attendees": "   "}, ["Attendees"])
+    assert result.ok is False
+    assert result.invalid == ["Attendees"]

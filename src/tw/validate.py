@@ -10,5 +10,8 @@ class ValidationResult:
 
 def validate(output: dict, fields: list[str]) -> ValidationResult:
     missing = [f for f in fields if f not in output]
-    invalid = [f for f in fields if f in output and not isinstance(output[f], str)]
+    invalid = [
+        f for f in fields
+        if f in output and (not isinstance(output[f], str) or not output[f].strip())
+    ]
     return ValidationResult(ok=not missing and not invalid, missing=missing, invalid=invalid)

@@ -80,6 +80,21 @@ def test_extract_fields_preserves_early_success_despite_later_json_errors():
     assert result.failed_fields == ["Decisions"]
 
 
+def test_extract_fields_treats_blank_string_as_failed_not_filled():
+    """
+    A blank/whitespace-only field value must not be accumulated into
+    best_filled and reported as successfully filled — it should end up
+    in failed_fields so assemble() marks it for manual review instead of
+    silently emitting an empty section.
+    """
+    def fake_call(prompt: str) -> str:
+        return json.dumps({"Attendees": "Alice", "Decisions": "   "})
+
+    result = extract_fields("transcript", ["Attendees", "Decisions"], fake_call)
+    assert result.filled == {"Attendees": "Alice"}
+    assert result.failed_fields == ["Decisions"]
+
+
 def test_extract_fields_recovers_from_early_json_error_to_late_success():
     """
     Verify that if an early attempt has invalid JSON but a later attempt

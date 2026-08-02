@@ -54,7 +54,7 @@ def extract_fields(
 
         # Accumulate any valid fields from this attempt into best_filled
         for field in fields:
-            if field in output and isinstance(output[field], str):
+            if field in output and isinstance(output[field], str) and output[field].strip():
                 best_filled[field] = output[field]
 
         error = f"missing fields: {result.missing}, invalid fields: {result.invalid}"
@@ -65,7 +65,7 @@ def extract_fields(
     return ExtractResult(filled=filled, failed_fields=failed)
 
 
-def call_ollama(prompt: str, model: str = "llama3.3") -> str:
+def call_ollama(prompt: str, model: str = "llama3.1:8b") -> str:
     import ollama
 
     response = ollama.chat(
