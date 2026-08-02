@@ -19,11 +19,18 @@ def test_assemble_marks_failed_fields(tmp_path):
     assert "> **NEEDS MANUAL REVIEW:** Decisions" in result
 
 
-def test_assemble_preserves_preamble(tmp_path):
+def test_assemble_handles_document_title_heading(tmp_path):
     template = tmp_path / "template.md"
     template.write_text("# Client Call Notes\n\n## Attendees\n")
     result = assemble(template, {"Client Call Notes": "", "Attendees": "Alice"}, [])
     assert result.startswith("# Client Call Notes")
+
+
+def test_assemble_drops_content_before_first_heading(tmp_path):
+    template = tmp_path / "template.md"
+    template.write_text("Some intro text.\n\n## Attendees\n")
+    result = assemble(template, {"Attendees": "Alice"}, [])
+    assert "Some intro text." not in result
 
 
 def test_assemble_raises_on_unaccounted_field(tmp_path):
