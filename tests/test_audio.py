@@ -25,3 +25,11 @@ def test_extract_audio_produces_wav(tmp_path):
     assert audio_path.exists()
     assert audio_path.suffix == ".wav"
     assert audio_path.stat().st_size > 0
+
+
+def test_extract_audio_refuses_to_overwrite_input(tmp_path):
+    wav_path = tmp_path / "recording.wav"
+    wav_path.write_bytes(b"fake wav data")
+
+    with pytest.raises(ValueError, match="refusing to overwrite"):
+        extract_audio(wav_path)
