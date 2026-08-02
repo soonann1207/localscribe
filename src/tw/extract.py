@@ -36,6 +36,7 @@ def extract_fields(
     error: str | None = None
     output: dict = {}
     result = ValidationResult(ok=False, missing=list(fields), invalid=[])
+    best_filled: dict[str, str] = {}  # Accumulate successfully extracted fields across attempts
 
     for _attempt in range(MAX_RETRIES + 1):
         prompt = build_prompt(labeled_transcript, fields, error)
@@ -50,10 +51,17 @@ def extract_fields(
         result = validate(output, fields)
         if result.ok:
             return ExtractResult(filled={f: output[f] for f in fields}, failed_fields=[])
+
+        # Accumulate any valid fields from this attempt into best_filled
+        for field in fields:
+            if field in output and isinstance(output[field], str):
+                best_filled[field] = output[field]
+
         error = f"missing fields: {result.missing}, invalid fields: {result.invalid}"
 
-    failed = result.missing + result.invalid
-    filled = {f: output[f] for f in fields if f not in failed and f in output}
+    # On exhaustion, return accumulated best_filled with any fields not extracted as failed
+    failed = [f for f in fields if f not in best_filled]
+    filled = {f: best_filled[f] for f in fields if f in best_filled}
     return ExtractResult(filled=filled, failed_fields=failed)
 
 
