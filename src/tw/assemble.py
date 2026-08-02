@@ -20,8 +20,10 @@ def assemble(template_path: Path, filled: dict[str, str], failed_fields: list[st
     for i, (line_no, heading_line, field_name) in enumerate(headings):
         if field_name in failed_fields:
             content = "[NEEDS MANUAL REVIEW]"
+        elif field_name in filled:
+            content = filled[field_name]
         else:
-            content = filled.get(field_name, "[NEEDS MANUAL REVIEW]")
+            raise ValueError(f"Template field '{field_name}' not in filled or failed_fields")
         parts.append(f"{heading_line}\n\n{content}".rstrip())
 
     return "\n\n".join(parts) + "\n"
