@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 
 @dataclass
@@ -21,3 +21,9 @@ class LabeledSegment:
     end: float
     speaker: str
     text: str
+
+
+def rescale_segment_times(segments: list, factor: float) -> list:
+    if factor == 1.0:
+        return list(segments)
+    return [replace(seg, start=seg.start / factor, end=seg.end / factor) for seg in segments]

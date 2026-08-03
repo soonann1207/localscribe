@@ -10,6 +10,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Fill a template from a recorded meeting/call.")
     parser.add_argument("--video", required=True, type=Path)
     parser.add_argument("--template", required=True, type=Path)
+    parser.add_argument(
+        "--speed-factor",
+        type=float,
+        default=1.0,
+        help="Speed up audio before transcription/diarization (e.g. 2.0 = 2x speed, faster but less accurate)",
+    )
     return parser.parse_args(argv)
 
 
@@ -40,7 +46,7 @@ def main(argv: list[str] | None = None) -> int:
 
     from tw.pipeline import run
 
-    output_path = run(args.video, args.template)
+    output_path = run(args.video, args.template, speed_factor=args.speed_factor)
     print(f"wrote {output_path}")
     return 0
 

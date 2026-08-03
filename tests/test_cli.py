@@ -8,6 +8,16 @@ def test_parse_args_requires_video_and_template():
     assert args.template == Path("t.md")
 
 
+def test_parse_args_speed_factor_defaults_to_one():
+    args = parse_args(["--video", "rec.mp4", "--template", "t.md"])
+    assert args.speed_factor == 1.0
+
+
+def test_parse_args_speed_factor_can_be_overridden():
+    args = parse_args(["--video", "rec.mp4", "--template", "t.md", "--speed-factor", "2.0"])
+    assert args.speed_factor == 2.0
+
+
 def test_preflight_check_flags_missing_ffmpeg(monkeypatch):
     monkeypatch.setattr("shutil.which", lambda name: None if name == "ffmpeg" else "/usr/bin/ollama")
     problems = preflight_check()
