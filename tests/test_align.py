@@ -1,6 +1,6 @@
 # tests/test_align.py
-from tw.align import align
-from tw.types import TranscriptSegment, SpeakerSegment
+from tw.align import align, format_transcript
+from tw.types import TranscriptSegment, SpeakerSegment, LabeledSegment
 
 def test_align_assigns_majority_overlap_speaker():
     transcript = [TranscriptSegment(start=0.0, end=2.0, text="hello there")]
@@ -72,3 +72,19 @@ def test_align_multiple_segments_different_speakers():
     assert len(result) == 2
     assert result[0].speaker == "SPEAKER_00"
     assert result[1].speaker == "SPEAKER_01"
+
+def test_format_transcript_merges_consecutive_same_speaker():
+    segments = [
+        LabeledSegment(start=0.0, end=1.0, speaker="SPEAKER_00", text="hello"),
+        LabeledSegment(start=1.0, end=2.0, speaker="SPEAKER_00", text="there"),
+        LabeledSegment(start=2.0, end=3.0, speaker="SPEAKER_01", text="hi back"),
+    ]
+    result = format_transcript(segments)
+    assert result == "[SPEAKER_00] hello there\n\n[SPEAKER_01] hi back"
+
+def test_format_transcript_empty_list_returns_empty_string():
+    assert format_transcript([]) == ""
+
+def test_format_transcript_single_segment():
+    segments = [LabeledSegment(start=0.0, end=1.0, speaker="SPEAKER_00", text="solo")]
+    assert format_transcript(segments) == "[SPEAKER_00] solo"

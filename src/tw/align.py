@@ -17,3 +17,20 @@ def align(transcript: list[TranscriptSegment], speakers: list[SpeakerSegment]) -
                 best_speaker = spk.speaker
         labeled.append(LabeledSegment(start=seg.start, end=seg.end, speaker=best_speaker, text=seg.text))
     return labeled
+
+
+def format_transcript(segments: list[LabeledSegment]) -> str:
+    if not segments:
+        return ""
+    turns = []
+    current_speaker = segments[0].speaker
+    current_texts = [segments[0].text]
+    for seg in segments[1:]:
+        if seg.speaker == current_speaker:
+            current_texts.append(seg.text)
+        else:
+            turns.append(f"[{current_speaker}] {' '.join(current_texts)}")
+            current_speaker = seg.speaker
+            current_texts = [seg.text]
+    turns.append(f"[{current_speaker}] {' '.join(current_texts)}")
+    return "\n\n".join(turns)

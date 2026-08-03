@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 
-from tw.align import align
+from tw.align import align, format_transcript
 from tw.assemble import assemble
 from tw.audio import extract_audio
 from tw.diarize import diarize
@@ -19,7 +19,7 @@ def run(video_path: Path, template_path: Path) -> Path:
     transcript = transcribe(audio_path)
     speakers = diarize(audio_path, os.environ["HF_TOKEN"])
     labeled = align(transcript, speakers)
-    labeled_text = "\n".join(f"[{seg.speaker}] {seg.text}" for seg in labeled)
+    labeled_text = format_transcript(labeled)
 
     extract_field_names = [f for f in fields if f != "Raw Transcript"]
     result = extract_fields(labeled_text, extract_field_names, call_model=call_ollama)
