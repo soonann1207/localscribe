@@ -8,7 +8,7 @@ Usage:
 """
 
 import argparse
-import itertools
+import json
 import os
 from pathlib import Path
 
@@ -22,17 +22,26 @@ from tw.transcribe import transcribe
 
 
 def fetch_meeting_rows(meeting_id: str, max_seconds: float) -> list[dict]:
+    # begin_time/end_time are absolute session time, not meeting-relative,
+    # so we can't cut off by comparing them directly to max_seconds. Rows
+    # for one meeting appear contiguously in the stream, so we collect the
+    # whole block, then take a chronological prefix relative to its own start.
     ds = load_dataset("edinburghcstr/ami", "sdm", split="test", streaming=True)
     rows = []
-    cumulative = 0.0
+    seen_target = False
     for row in ds:
-        if row["meeting_id"] != meeting_id:
-            continue
-        rows.append(row)
-        cumulative = row["end_time"]
-        if cumulative >= max_seconds:
+        if row["meeting_id"] == meeting_id:
+            rows.append(row)
+            seen_target = True
+        elif seen_target:
             break
-    return sorted(rows, key=lambda r: r["begin_time"])
+
+    if not rows:
+        raise ValueError(f"no rows found for meeting_id={meeting_id}")
+
+    rows.sort(key=lambda r: r["begin_time"])
+    start = rows[0]["begin_time"]
+    return [r for r in rows if r["end_time"] - start <= max_seconds]
 
 
 def reconstruct_audio(rows: list[dict], output_path: Path) -> list[dict]:
@@ -62,7 +71,7 @@ def reconstruct_audio(rows: list[dict], output_path: Path) -> list[dict]:
     return adjusted_rows
 
 
-def run_eval(meeting_id: str, max_seconds: float) -> None:
+def run_eval(meeting_id: str, max_seconds: float, save_details: Path | None) -> None:
     print(f"Fetching {meeting_id} (up to {max_seconds}s) from AMI sdm test split...")
     rows = fetch_meeting_rows(meeting_id, max_seconds)
     print(f"Got {len(rows)} utterances, reconstructing continuous audio...")
@@ -86,11 +95,34 @@ def run_eval(meeting_id: str, max_seconds: float) -> None:
     print(f"\n=== {meeting_id} ({adjusted_rows[-1]['end_time']:.0f}s reconstructed) ===")
     print(f"WER (word error rate): {wer:.1%}")
     print(f"DER (diarization error rate): {der:.1%}")
+    print(f"reference word count: {len(reference_text.split())}")
+    print(f"hypothesis word count: {len(hypothesis_text.split())}")
+
+    if save_details:
+        import jiwer
+
+        word_output = jiwer.process_words(reference_text, hypothesis_text)
+        save_details.parent.mkdir(parents=True, exist_ok=True)
+        save_details.write_text(
+            json.dumps(
+                {
+                    "reference_text": reference_text,
+                    "hypothesis_text": hypothesis_text,
+                    "hits": word_output.hits,
+                    "substitutions": word_output.substitutions,
+                    "insertions": word_output.insertions,
+                    "deletions": word_output.deletions,
+                },
+                indent=2,
+            )
+        )
+        print(f"Details written to {save_details}")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--meeting-id", default="EN2002c")
     parser.add_argument("--max-seconds", type=float, default=240.0)
+    parser.add_argument("--save-details", type=Path, default=None)
     args = parser.parse_args()
-    run_eval(args.meeting_id, args.max_seconds)
+    run_eval(args.meeting_id, args.max_seconds, args.save_details)
