@@ -4,10 +4,26 @@ from pyannote.metrics.diarization import DiarizationErrorRate
 from tw.types import SpeakerSegment
 
 
+def _normalization_transform():
+    import jiwer
+
+    return jiwer.Compose(
+        [
+            jiwer.ExpandCommonEnglishContractions(),
+            jiwer.ToLowerCase(),
+            jiwer.RemovePunctuation(),
+            jiwer.RemoveMultipleSpaces(),
+            jiwer.Strip(),
+            jiwer.ReduceToListOfListOfWords(),
+        ]
+    )
+
+
 def compute_wer(reference: str, hypothesis: str) -> float:
     import jiwer
 
-    return jiwer.wer(reference, hypothesis)
+    transform = _normalization_transform()
+    return jiwer.wer(reference, hypothesis, reference_transform=transform, hypothesis_transform=transform)
 
 
 def build_reference_annotation(rows: list[dict]) -> Annotation:

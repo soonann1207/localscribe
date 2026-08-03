@@ -13,6 +13,12 @@ def test_compute_wer_counts_substitutions():
     assert wer > 0.0
 
 
+def test_compute_wer_ignores_case_and_punctuation():
+    reference = "HELLO THERE WORLD"
+    hypothesis = "Hello, there world."
+    assert compute_wer(reference, hypothesis) == 0.0
+
+
 def test_build_reference_annotation_from_rows():
     rows = [
         {"begin_time": 0.0, "end_time": 1.0, "speaker_id": "A"},
