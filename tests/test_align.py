@@ -77,14 +77,21 @@ def test_format_transcript_merges_consecutive_same_speaker():
     segments = [
         LabeledSegment(start=0.0, end=1.0, speaker="SPEAKER_00", text="hello"),
         LabeledSegment(start=1.0, end=2.0, speaker="SPEAKER_00", text="there"),
-        LabeledSegment(start=2.0, end=3.0, speaker="SPEAKER_01", text="hi back"),
+        LabeledSegment(start=65.0, end=66.0, speaker="SPEAKER_01", text="hi back"),
     ]
     result = format_transcript(segments)
-    assert result == "[SPEAKER_00] hello there\n\n[SPEAKER_01] hi back"
+    assert result == "[00:00:00] [SPEAKER_00] hello there\n\n[00:01:05] [SPEAKER_01] hi back"
 
 def test_format_transcript_empty_list_returns_empty_string():
     assert format_transcript([]) == ""
 
 def test_format_transcript_single_segment():
     segments = [LabeledSegment(start=0.0, end=1.0, speaker="SPEAKER_00", text="solo")]
-    assert format_transcript(segments) == "[SPEAKER_00] solo"
+    assert format_transcript(segments) == "[00:00:00] [SPEAKER_00] solo"
+
+def test_format_transcript_timestamp_uses_turns_first_segment_start():
+    segments = [
+        LabeledSegment(start=3661.0, end=3662.0, speaker="SPEAKER_00", text="over an hour in"),
+    ]
+    result = format_transcript(segments)
+    assert result == "[01:01:01] [SPEAKER_00] over an hour in"

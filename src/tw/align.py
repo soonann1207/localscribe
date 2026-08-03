@@ -19,18 +19,32 @@ def align(transcript: list[TranscriptSegment], speakers: list[SpeakerSegment]) -
     return labeled
 
 
+def _format_timestamp(seconds: float) -> str:
+    total = int(seconds)
+    hours, remainder = divmod(total, 3600)
+    minutes, secs = divmod(remainder, 60)
+    return f"{hours:02d}:{minutes:02d}:{secs:02d}"
+
+
 def format_transcript(segments: list[LabeledSegment]) -> str:
     if not segments:
         return ""
     turns = []
+    turn_start = segments[0].start
     current_speaker = segments[0].speaker
     current_texts = [segments[0].text]
+
+    def _flush():
+        timestamp = _format_timestamp(turn_start)
+        turns.append(f"[{timestamp}] [{current_speaker}] {' '.join(current_texts)}")
+
     for seg in segments[1:]:
         if seg.speaker == current_speaker:
             current_texts.append(seg.text)
         else:
-            turns.append(f"[{current_speaker}] {' '.join(current_texts)}")
+            _flush()
+            turn_start = seg.start
             current_speaker = seg.speaker
             current_texts = [seg.text]
-    turns.append(f"[{current_speaker}] {' '.join(current_texts)}")
+    _flush()
     return "\n\n".join(turns)
