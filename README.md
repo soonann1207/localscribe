@@ -9,6 +9,23 @@ Not a meeting-minutes generator. It automates the manual step of listening
 to a recording and typing its content into a required document format,
 for whatever template the situation calls for.
 
+## How it works
+
+```mermaid
+flowchart TD
+    A[Record the meeting or call] --> C[Upload recording and template]
+    B[Provide a template for the\ndocument you need] --> C
+    C --> D[System listens and writes down\nwhat was said]
+    D --> E[System identifies who said what]
+    E --> F[System fills in each section\nof your template]
+    F --> G{Confident about\nthe content?}
+    G -- Yes --> H[Section filled in]
+    G -- No --> I[Section flagged for you\nto review]
+    H --> J[Completed document delivered]
+    I --> J
+    J --> K[Nothing leaves your computer\nat any step]
+```
+
 ## Status
 
 v1 pipeline implemented (11/11 tasks complete), pending real-world integration test. See:
