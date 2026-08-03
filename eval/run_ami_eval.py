@@ -17,8 +17,10 @@ import soundfile as sf
 from datasets import load_dataset
 
 from tw.ami_eval import build_hypothesis_annotation, build_reference_annotation, compute_der, compute_wer
+from tw.audio import extract_audio
 from tw.diarize import diarize
 from tw.transcribe import transcribe
+from tw.types import rescale_segment_times
 
 
 def fetch_meeting_rows(meeting_id: str, max_seconds: float) -> list[dict]:
@@ -71,7 +73,7 @@ def reconstruct_audio(rows: list[dict], output_path: Path) -> list[dict]:
     return adjusted_rows
 
 
-def run_eval(meeting_id: str, max_seconds: float, save_details: Path | None) -> None:
+def run_eval(meeting_id: str, max_seconds: float, save_details: Path | None, speed_factor: float = 1.0) -> None:
     print(f"Fetching {meeting_id} (up to {max_seconds}s) from AMI sdm test split...")
     rows = fetch_meeting_rows(meeting_id, max_seconds)
     print(f"Got {len(rows)} utterances, reconstructing continuous audio...")
@@ -80,19 +82,29 @@ def run_eval(meeting_id: str, max_seconds: float, save_details: Path | None) -> 
     adjusted_rows = reconstruct_audio(rows, audio_path)
     reference_text = " ".join(row["text"] for row in rows)
 
+    transcribe_path = audio_path
+    if speed_factor != 1.0:
+        transcribe_path = Path("samples/ami_eval") / f"{meeting_id}_speed{speed_factor}.wav"
+        print(f"Speeding up audio by {speed_factor}x...")
+        extract_audio(audio_path, output_path=transcribe_path, speed_factor=speed_factor)
+
     print("Running transcribe()...")
-    transcript = transcribe(audio_path)
+    transcript = transcribe(transcribe_path)
+    if speed_factor != 1.0:
+        transcript = rescale_segment_times(transcript, speed_factor)
     hypothesis_text = " ".join(seg.text for seg in transcript)
 
     print("Running diarize()...")
-    speakers = diarize(audio_path, os.environ["HF_TOKEN"])
+    speakers = diarize(transcribe_path, os.environ["HF_TOKEN"])
+    if speed_factor != 1.0:
+        speakers = rescale_segment_times(speakers, speed_factor)
 
     wer = compute_wer(reference_text, hypothesis_text)
     ref_annotation = build_reference_annotation(adjusted_rows)
     hyp_annotation = build_hypothesis_annotation(speakers)
     der = compute_der(ref_annotation, hyp_annotation)
 
-    print(f"\n=== {meeting_id} ({adjusted_rows[-1]['end_time']:.0f}s reconstructed) ===")
+    print(f"\n=== {meeting_id} ({adjusted_rows[-1]['end_time']:.0f}s reconstructed, speed_factor={speed_factor}) ===")
     print(f"WER (word error rate): {wer:.1%}")
     print(f"DER (diarization error rate): {der:.1%}")
     print(f"reference word count: {len(reference_text.split())}")
@@ -124,5 +136,6 @@ if __name__ == "__main__":
     parser.add_argument("--meeting-id", default="EN2002c")
     parser.add_argument("--max-seconds", type=float, default=240.0)
     parser.add_argument("--save-details", type=Path, default=None)
+    parser.add_argument("--speed-factor", type=float, default=1.0)
     args = parser.parse_args()
-    run_eval(args.meeting_id, args.max_seconds, args.save_details)
+    run_eval(args.meeting_id, args.max_seconds, args.save_details, args.speed_factor)
