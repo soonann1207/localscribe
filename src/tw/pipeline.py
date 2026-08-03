@@ -21,9 +21,14 @@ def run(video_path: Path, template_path: Path) -> Path:
     labeled = align(transcript, speakers)
     labeled_text = "\n".join(f"[{seg.speaker}] {seg.text}" for seg in labeled)
 
-    result = extract_fields(labeled_text, fields, call_model=call_ollama)
+    extract_field_names = [f for f in fields if f != "Raw Transcript"]
+    result = extract_fields(labeled_text, extract_field_names, call_model=call_ollama)
 
-    output_text = assemble(template_path, result.filled, result.failed_fields)
+    filled = dict(result.filled)
+    if "Raw Transcript" in fields:
+        filled["Raw Transcript"] = labeled_text
+
+    output_text = assemble(template_path, filled, result.failed_fields)
     output_path = template_path.with_name(template_path.stem + "_filled.md")
     output_path.write_text(output_text)
     return output_path
