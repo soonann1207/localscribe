@@ -25,9 +25,10 @@ def load_examples(data_dir: Path, limit: int) -> list[dict]:
     return examples
 
 
-def run_eval(data_dir: Path, limit: int) -> None:
+def run_eval(data_dir: Path, limit: int, details_path: Path | None) -> None:
     examples = load_examples(data_dir, limit)
     total, matched, partial, mismatched = 0, 0, 0, 0
+    details = []
 
     for example in examples:
         fields = list(example["queries"].keys())
@@ -48,16 +49,30 @@ def run_eval(data_dir: Path, limit: int) -> None:
                 mismatched += 1
 
             print(f"  [{verdict}] {field[:60]}")
+            details.append(
+                {
+                    "file": example["file"],
+                    "query": field,
+                    "reference": reference,
+                    "extracted": extracted,
+                    "verdict": verdict,
+                }
+            )
 
     print(f"\n=== Summary: {total} fields evaluated ===")
     print(f"MATCH: {matched} ({matched / total:.0%})")
     print(f"PARTIAL: {partial} ({partial / total:.0%})")
     print(f"MISMATCH: {mismatched} ({mismatched / total:.0%})")
 
+    if details_path:
+        details_path.write_text(json.dumps(details, indent=2))
+        print(f"\nPer-field details written to {details_path}")
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--data-dir", type=Path, default=Path("samples/QMSum/data/Academic/test"))
     parser.add_argument("--limit", type=int, default=5)
+    parser.add_argument("--save-details", type=Path, default=None)
     args = parser.parse_args()
-    run_eval(args.data_dir, args.limit)
+    run_eval(args.data_dir, args.limit, args.save_details)
