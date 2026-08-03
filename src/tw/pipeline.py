@@ -5,13 +5,15 @@ from tw.align import align, format_transcript
 from tw.assemble import assemble
 from tw.audio import extract_audio
 from tw.diarize import diarize
+from tw.docx_template import assemble_docx, parse_fields_docx
 from tw.extract import call_ollama, extract_fields
 from tw.template import parse_fields
 from tw.transcribe import transcribe
 
 
 def run(video_path: Path, template_path: Path) -> Path:
-    fields = parse_fields(template_path)
+    is_docx = template_path.suffix.lower() == ".docx"
+    fields = parse_fields_docx(template_path) if is_docx else parse_fields(template_path)
     if not fields:
         raise ValueError(f"template has no headings/fields: {template_path}")
 
@@ -28,7 +30,11 @@ def run(video_path: Path, template_path: Path) -> Path:
     if "Raw Transcript" in fields:
         filled["Raw Transcript"] = labeled_text
 
-    output_text = assemble(template_path, filled, result.failed_fields)
-    output_path = template_path.with_name(template_path.stem + "_filled.md")
-    output_path.write_text(output_text)
+    if is_docx:
+        output_path = template_path.with_name(template_path.stem + "_filled.docx")
+        assemble_docx(template_path, filled, result.failed_fields, output_path)
+    else:
+        output_text = assemble(template_path, filled, result.failed_fields)
+        output_path = template_path.with_name(template_path.stem + "_filled.md")
+        output_path.write_text(output_text)
     return output_path
