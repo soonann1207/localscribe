@@ -47,6 +47,7 @@ def get_job_queue() -> JobQueue:
 job_queue = get_job_queue()
 
 st.session_state.setdefault("renamed_output_paths", {})  # job_id -> renamed Path
+st.session_state.setdefault("uploader_key", 0)
 
 st.download_button(
     "Download blank template",
@@ -55,18 +56,28 @@ st.download_button(
     help="For reference only — the app always uses this fixed template, you can't upload a different one.",
 )
 
-video_file = st.file_uploader("Video or audio recording", type=["mp4", "mov", "m4v", "wav", "m4a"])
+video_files = st.file_uploader(
+    "Video or audio recording(s)",
+    type=["mp4", "mov", "m4v", "wav", "m4a"],
+    accept_multiple_files=True,
+    key=f"uploader_{st.session_state.uploader_key}",
+)
 SPEED_FACTOR = 1.0  # removed from UI: not validated as reliable yet, see AMI eval harness
 
-if st.button("Queue", type="primary", disabled=not video_file):
-    tmp = Path(tempfile.mkdtemp())
-    video_path = tmp / video_file.name
-    video_path.write_bytes(video_file.getvalue())
-    try:
-        job_queue.submit(video_path, video_file.name, TEMPLATE_PATH, INTERVAL_MINUTES, SPEED_FACTOR)
-        st.success(f"Queued: {video_file.name}")
-    except RuntimeError as e:
-        st.error(str(e))
+if st.button("Queue", type="primary", disabled=not video_files):
+    for video_file in video_files:
+        tmp = Path(tempfile.mkdtemp())
+        video_path = tmp / video_file.name
+        video_path.write_bytes(video_file.getvalue())
+        try:
+            job_queue.submit(video_path, video_file.name, TEMPLATE_PATH, INTERVAL_MINUTES, SPEED_FACTOR)
+            st.success(f"Queued: {video_file.name}")
+        except RuntimeError as e:
+            st.error(f"{video_file.name}: {e}")
+    # Bump the uploader's key so it resets to empty on the next rerun,
+    # instead of continuing to show these files as "selected".
+    st.session_state.uploader_key += 1
+    st.rerun()
 
 
 @st.fragment(run_every="3s")
