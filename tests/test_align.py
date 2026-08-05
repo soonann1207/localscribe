@@ -1,5 +1,5 @@
 # tests/test_align.py
-from tw.align import align, format_transcript
+from tw.align import align, format_transcript, bucket_by_interval
 from tw.types import TranscriptSegment, SpeakerSegment, LabeledSegment
 
 def test_align_assigns_majority_overlap_speaker():
@@ -95,3 +95,28 @@ def test_format_transcript_timestamp_uses_turns_first_segment_start():
     ]
     result = format_transcript(segments)
     assert result == "[01:01:01] [SPEAKER_00] over an hour in"
+
+def test_bucket_by_interval_groups_by_5min_window():
+    segments = [
+        LabeledSegment(start=270.0, end=271.0, speaker="SPEAKER_00", text="before boundary"),  # 4:30 -> interval 1
+        LabeledSegment(start=330.0, end=331.0, speaker="SPEAKER_00", text="after boundary"),  # 5:30 -> interval 2
+    ]
+    buckets = bucket_by_interval(segments, interval_seconds=300.0)
+    assert set(buckets.keys()) == {1, 2}
+    assert "before boundary" in buckets[1]
+    assert "after boundary" in buckets[2]
+
+def test_bucket_by_interval_straddling_segment_uses_start_time():
+    segments = [
+        LabeledSegment(start=298.0, end=303.0, speaker="SPEAKER_00", text="straddles boundary"),
+    ]
+    buckets = bucket_by_interval(segments, interval_seconds=300.0)
+    assert set(buckets.keys()) == {1}
+
+def test_bucket_by_interval_empty_segments_returns_empty_dict():
+    assert bucket_by_interval([], interval_seconds=300.0) == {}
+
+def test_bucket_by_interval_renders_each_bucket_like_format_transcript():
+    segments = [LabeledSegment(start=0.0, end=1.0, speaker="SPEAKER_00", text="hello")]
+    buckets = bucket_by_interval(segments, interval_seconds=300.0)
+    assert buckets[1] == format_transcript(segments)

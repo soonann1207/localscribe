@@ -48,3 +48,11 @@ def format_transcript(segments: list[LabeledSegment]) -> str:
             current_texts = [seg.text]
     _flush()
     return "\n\n".join(turns)
+
+
+def bucket_by_interval(segments: list[LabeledSegment], interval_seconds: float = 300.0) -> dict[int, str]:
+    buckets: dict[int, list[LabeledSegment]] = {}
+    for seg in segments:
+        interval_num = int(seg.start // interval_seconds) + 1
+        buckets.setdefault(interval_num, []).append(seg)
+    return {num: format_transcript(segs) for num, segs in buckets.items()}
