@@ -98,10 +98,11 @@ def show_jobs():
                         st.success("Names applied.")
 
                 download_path = st.session_state.renamed_output_paths.get(job.id, job.output_path)
+                download_name = f"{Path(job.video_name).stem}_transcript{download_path.suffix}"
                 st.download_button(
                     "Download result",
                     data=download_path.read_bytes(),
-                    file_name=download_path.name,
+                    file_name=download_name,
                     key=f"download_{job.id}",
                 )
 
