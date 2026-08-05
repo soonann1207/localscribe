@@ -15,12 +15,26 @@ def fill_interval_table(template_path: Path, buckets: dict[int, str], output_pat
     header = [c.text.strip() for c in table.rows[0].cells]
     transcription_col = header.index("Transcription")
 
+    existing_ints = set()
+    rows_to_remove = []
     for row in table.rows[1:]:
         match = _INT_ROW_RE.match(row.cells[0].text.strip())
         if not match:
             continue
         interval_num = int(match.group(1))
-        row.cells[transcription_col].text = buckets.get(interval_num, "Not mentioned in recording")
+        existing_ints.add(interval_num)
+        if interval_num in buckets:
+            row.cells[transcription_col].text = buckets[interval_num]
+        else:
+            rows_to_remove.append(row)  # no speech in this interval: drop the row rather than leave it blank
+
+    for row in rows_to_remove:
+        row._element.getparent().remove(row._element)  # python-docx has no public remove_row()
+
+    for interval_num in sorted(n for n in buckets if n not in existing_ints):
+        new_row = table.add_row()
+        new_row.cells[0].text = f"Int {interval_num}"
+        new_row.cells[transcription_col].text = buckets[interval_num]
 
     doc.save(output_path)
     return output_path

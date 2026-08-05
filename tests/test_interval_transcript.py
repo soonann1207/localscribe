@@ -29,18 +29,40 @@ def test_fill_interval_table_fills_transcription_column_only(tmp_path):
     assert table.rows[2].cells[1].text == "[00:05:10] [SPEAKER_01] hi back"
 
 
-def test_fill_interval_table_marks_intervals_with_no_speech(tmp_path):
+def test_fill_interval_table_removes_rows_with_no_speech(tmp_path):
     template = tmp_path / "template.docx"
-    _make_table_template(template)
+    _make_table_template(template)  # Int 1, Int 2, Int 3
     output = tmp_path / "out.docx"
 
     result_path = fill_interval_table(template, {1: "[00:00:00] [SPEAKER_00] hello"}, output)
 
     doc = Document(result_path)
     table = doc.tables[0]
+    labels = [row.cells[0].text for row in table.rows[1:]]
+    assert labels == ["Int 1"]
     assert table.rows[1].cells[1].text == "[00:00:00] [SPEAKER_00] hello"
-    assert table.rows[2].cells[1].text == "Not mentioned in recording"
-    assert table.rows[3].cells[1].text == "Not mentioned in recording"
+
+
+def test_fill_interval_table_appends_rows_beyond_template(tmp_path):
+    template = tmp_path / "template.docx"
+    _make_table_template(template)  # Int 1, Int 2, Int 3
+    output = tmp_path / "out.docx"
+
+    buckets = {
+        1: "[00:00:00] [SPEAKER_00] hello",
+        2: "[00:05:00] [SPEAKER_00] hi",
+        3: "[00:10:00] [SPEAKER_00] hey",
+        4: "[00:15:00] [SPEAKER_00] extra one",
+        5: "[00:20:00] [SPEAKER_00] extra two",
+    }
+    result_path = fill_interval_table(template, buckets, output)
+
+    doc = Document(result_path)
+    table = doc.tables[0]
+    labels = [row.cells[0].text for row in table.rows[1:]]
+    assert labels == ["Int 1", "Int 2", "Int 3", "Int 4", "Int 5"]
+    assert table.rows[4].cells[1].text == "[00:15:00] [SPEAKER_00] extra one"
+    assert table.rows[5].cells[1].text == "[00:20:00] [SPEAKER_00] extra two"
 
 
 def test_fill_interval_table_leaves_other_columns_untouched(tmp_path):
