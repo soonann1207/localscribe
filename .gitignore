@@ -30,3 +30,7 @@ tests/fixtures/*.mp4
 
 # subagent-driven-development workspace
 .superpowers/
+
+# local Claude Code tool/skill state
+.agents/
+.claude/
