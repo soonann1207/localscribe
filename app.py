@@ -1,5 +1,5 @@
 """Streamlit UI for localscribe. Runs entirely on-device; upload a
-recording + template, get the filled document back.
+recording, get the fixed coding-transcript template filled back.
 
 Run: uv run streamlit run app.py
 Access from other devices on your home network at http://<this-machine's-LAN-IP>:8501
@@ -11,12 +11,15 @@ from pathlib import Path
 import streamlit as st
 
 from tw.cli import preflight_check
-from tw.pipeline import run
+from tw.interval_transcript import run
 from tw.speaker_rename import extract_speakers_from_file, rename_speakers_in_file
+
+TEMPLATE_PATH = Path(__file__).parent / "templates" / "coding_transcription_template.docx"
+INTERVAL_MINUTES = 5.0
 
 st.set_page_config(page_title="localscribe", page_icon="🎙️")
 st.title("localscribe")
-st.caption("Fill a template from a recorded meeting/call — fully local, nothing leaves this machine.")
+st.caption("Fill the coding transcript template from a recording — fully local, nothing leaves this machine.")
 
 problems = preflight_check()
 if problems:
@@ -28,8 +31,14 @@ st.session_state.setdefault("output_path", None)
 st.session_state.setdefault("speakers", None)
 st.session_state.setdefault("renamed_output_path", None)
 
+st.download_button(
+    "Download blank template",
+    data=TEMPLATE_PATH.read_bytes(),
+    file_name=TEMPLATE_PATH.name,
+    help="For reference only — the app always uses this fixed template, you can't upload a different one.",
+)
+
 video_file = st.file_uploader("Video or audio recording", type=["mp4", "mov", "m4v", "wav", "m4a"])
-template_file = st.file_uploader("Template (Markdown or Word)", type=["md", "docx"])
 speed_factor = st.slider(
     "Speed factor",
     min_value=1.0,
@@ -39,18 +48,16 @@ speed_factor = st.slider(
     help="Speeds up transcription/diarization. 1.0 = normal (most accurate). Higher = faster, unvalidated accuracy trade-off.",
 )
 
-if st.button("Run", type="primary", disabled=not (video_file and template_file)):
+if st.button("Run", type="primary", disabled=not video_file):
     # A persistent temp dir (not auto-deleted): the output file must still
     # exist on later reruns, e.g. when the rename form below is submitted.
     tmp = Path(tempfile.mkdtemp())
     video_path = tmp / video_file.name
     video_path.write_bytes(video_file.getvalue())
-    template_path = tmp / template_file.name
-    template_path.write_bytes(template_file.getvalue())
 
     with st.spinner("Processing — this can take a while for long recordings"):
         try:
-            output_path = run(video_path, template_path, speed_factor=speed_factor)
+            output_path = run(video_path, TEMPLATE_PATH, interval_minutes=INTERVAL_MINUTES, speed_factor=speed_factor)
         except Exception as e:
             st.error(f"Failed: {e}")
             st.stop()
