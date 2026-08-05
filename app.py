@@ -12,6 +12,7 @@ import streamlit as st
 
 from tw.cli import preflight_check
 from tw.pipeline import run
+from tw.speaker_rename import extract_speakers_from_file, rename_speakers_in_file
 
 st.set_page_config(page_title="localscribe", page_icon="🎙️")
 st.title("localscribe")
@@ -22,6 +23,10 @@ if problems:
     for p in problems:
         st.error(p)
     st.stop()
+
+st.session_state.setdefault("output_path", None)
+st.session_state.setdefault("speakers", None)
+st.session_state.setdefault("renamed_output_path", None)
 
 video_file = st.file_uploader("Video or audio recording", type=["mp4", "mov", "m4v", "wav", "m4a"])
 template_file = st.file_uploader("Template (Markdown or Word)", type=["md", "docx"])
@@ -35,23 +40,48 @@ speed_factor = st.slider(
 )
 
 if st.button("Run", type="primary", disabled=not (video_file and template_file)):
-    with tempfile.TemporaryDirectory() as tmp_dir:
-        tmp = Path(tmp_dir)
-        video_path = tmp / video_file.name
-        video_path.write_bytes(video_file.getvalue())
-        template_path = tmp / template_file.name
-        template_path.write_bytes(template_file.getvalue())
+    # A persistent temp dir (not auto-deleted): the output file must still
+    # exist on later reruns, e.g. when the rename form below is submitted.
+    tmp = Path(tempfile.mkdtemp())
+    video_path = tmp / video_file.name
+    video_path.write_bytes(video_file.getvalue())
+    template_path = tmp / template_file.name
+    template_path.write_bytes(template_file.getvalue())
 
-        with st.spinner("Processing — this can take a while for long recordings"):
-            try:
-                output_path = run(video_path, template_path, speed_factor=speed_factor)
-            except Exception as e:
-                st.error(f"Failed: {e}")
-                st.stop()
+    with st.spinner("Processing — this can take a while for long recordings"):
+        try:
+            output_path = run(video_path, template_path, speed_factor=speed_factor)
+        except Exception as e:
+            st.error(f"Failed: {e}")
+            st.stop()
 
-        st.success(f"Done: {output_path.name}")
-        st.download_button(
-            "Download result",
-            data=output_path.read_bytes(),
-            file_name=output_path.name,
-        )
+    st.session_state.output_path = output_path
+    st.session_state.speakers = sorted(extract_speakers_from_file(output_path))
+    st.session_state.renamed_output_path = None
+
+if st.session_state.output_path:
+    st.success(f"Done: {st.session_state.output_path.name}")
+
+    if st.session_state.speakers:
+        st.subheader("Speakers detected")
+        with st.form("rename_speakers_form"):
+            new_names = {}
+            for label in st.session_state.speakers:
+                new_names[label] = st.text_input(label, value=label, key=f"name_{label}")
+            renamed_submitted = st.form_submit_button("Apply names")
+
+        if renamed_submitted:
+            mapping = {old: new.strip() for old, new in new_names.items() if new.strip() and new.strip() != old}
+            renamed_path = st.session_state.output_path.with_name(
+                st.session_state.output_path.stem + "_renamed" + st.session_state.output_path.suffix
+            )
+            rename_speakers_in_file(st.session_state.output_path, mapping, renamed_path)
+            st.session_state.renamed_output_path = renamed_path
+            st.success("Names applied.")
+
+    download_path = st.session_state.renamed_output_path or st.session_state.output_path
+    st.download_button(
+        "Download result",
+        data=download_path.read_bytes(),
+        file_name=download_path.name,
+    )
