@@ -74,10 +74,11 @@ if st.button("Queue", type="primary", disabled=not video_files):
             st.success(f"Queued: {video_file.name}")
         except RuntimeError as e:
             st.error(f"{video_file.name}: {e}")
-    # Bump the uploader's key so it resets to empty on the next rerun,
-    # instead of continuing to show these files as "selected".
+    # Bump the uploader's key so it resets to empty on the natural rerun
+    # that already follows a button click. An explicit st.rerun() here
+    # collides with the run_every fragment below (stale fragment-id spam
+    # in the server log), so don't add one.
     st.session_state.uploader_key += 1
-    st.rerun()
 
 
 @st.fragment(run_every="3s")
