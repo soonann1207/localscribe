@@ -118,6 +118,25 @@ def test_completed_job_frees_slot_for_new_submission(tmp_path):
     assert _wait_for(lambda: q.get_job(job2).status == "done")
 
 
+def test_output_written_to_dedicated_output_dir(tmp_path):
+    def fake_run(video_path, template_path, interval_minutes, speed_factor):
+        output = tmp_path / "result.docx"
+        output.write_text("fake result")
+        return output
+
+    output_dir = tmp_path / "outputs"
+    q = JobQueue(run_fn=fake_run, max_active=5, workdir=tmp_path / "workdir", output_dir=output_dir)
+    video_path = tmp_path / "video.mp4"
+    video_path.write_bytes(b"fake video")
+
+    job_id = q.submit(video_path, "video.mp4", Path("template.docx"), 5.0, 1.0)
+    assert _wait_for(lambda: q.get_job(job_id).status == "done")
+
+    job = q.get_job(job_id)
+    assert job.output_path.parent == output_dir
+    assert job.output_path.parent != tmp_path / "workdir"
+
+
 def test_jobs_persist_across_queue_instances(tmp_path):
     def fake_run(video_path, template_path, interval_minutes, speed_factor):
         output = tmp_path / "result.docx"

@@ -49,11 +49,16 @@ class JobQueue:
         run_fn: Callable[[Path, Path, float, float], Path],
         max_active: int = 5,
         workdir: Path | None = None,
+        output_dir: Path | None = None,
     ):
         self._run_fn = run_fn
         self._max_active = max_active
         self._workdir = workdir or Path("job_queue_workdir")
         self._workdir.mkdir(parents=True, exist_ok=True)
+        # Deliverables (filled transcripts) live separately from queue
+        # bookkeeping (jobs.json), so the output location reads clearly.
+        self._output_dir = output_dir or (self._workdir / "outputs")
+        self._output_dir.mkdir(parents=True, exist_ok=True)
         self._jobs_file = self._workdir / "jobs.json"
         self._jobs: dict[str, Job] = {}
         self._pending: dict[str, tuple] = {}
@@ -107,7 +112,7 @@ class JobQueue:
                 self._save_jobs()
             try:
                 result_path = self._run_fn(video_path, template_path, interval_minutes, speed_factor)
-                stable_output = self._workdir / f"{job_id}_{Path(result_path).name}"
+                stable_output = self._output_dir / f"{job_id}_{Path(result_path).name}"
                 shutil.copy(result_path, stable_output)
                 with self._lock:
                     self._jobs[job_id].status = "done"

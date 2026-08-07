@@ -43,7 +43,8 @@ def get_job_queue() -> JobQueue:
     # Project-relative, not system temp: outputs and jobs.json need to
     # survive across app restarts, and macOS periodically sweeps /tmp.
     workdir = Path(__file__).parent / "job_queue_data"
-    return JobQueue(run_fn=run_interval_transcript, max_active=MAX_ACTIVE_JOBS, workdir=workdir)
+    output_dir = Path(__file__).parent / "outputs"
+    return JobQueue(run_fn=run_interval_transcript, max_active=MAX_ACTIVE_JOBS, workdir=workdir, output_dir=output_dir)
 
 
 job_queue = get_job_queue()
