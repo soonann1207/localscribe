@@ -118,6 +118,48 @@ def test_completed_job_frees_slot_for_new_submission(tmp_path):
     assert _wait_for(lambda: q.get_job(job2).status == "done")
 
 
+def test_jobs_persist_across_queue_instances(tmp_path):
+    def fake_run(video_path, template_path, interval_minutes, speed_factor):
+        output = tmp_path / "result.docx"
+        output.write_text("fake result")
+        return output
+
+    workdir = tmp_path / "workdir"
+    q1 = JobQueue(run_fn=fake_run, max_active=5, workdir=workdir)
+    video_path = tmp_path / "video.mp4"
+    video_path.write_bytes(b"fake video")
+    job_id = q1.submit(video_path, "video.mp4", Path("template.docx"), 5.0, 1.0)
+    assert _wait_for(lambda: q1.get_job(job_id).status == "done")
+
+    # Simulate a server restart: a fresh JobQueue pointed at the same workdir
+    # should recover the completed job from disk, not start with an empty list.
+    q2 = JobQueue(run_fn=fake_run, max_active=5, workdir=workdir)
+    jobs = q2.list_jobs()
+    assert any(j.id == job_id and j.status == "done" for j in jobs)
+    restored = q2.get_job(job_id)
+    assert restored.output_path.exists()
+    assert restored.output_path.read_text() == "fake result"
+
+
+def test_interrupted_jobs_marked_as_error_on_reload(tmp_path):
+    def fake_run(video_path, template_path, interval_minutes, speed_factor):
+        output = tmp_path / "result.docx"
+        output.write_text("fake result")
+        return output
+
+    workdir = tmp_path / "workdir"
+    workdir.mkdir(parents=True)
+    (workdir / "jobs.json").write_text(
+        '[{"id": "abc", "video_name": "stuck.mp4", "status": "processing", '
+        '"output_path": null, "error": null, "submitted_at": 1.0}]'
+    )
+
+    q = JobQueue(run_fn=fake_run, max_active=5, workdir=workdir)
+    job = q.get_job("abc")
+    assert job.status == "error"
+    assert "interrupted" in job.error.lower()
+
+
 def test_list_jobs_returns_all_submitted_jobs(tmp_path):
     def fake_run(video_path, template_path, interval_minutes, speed_factor):
         output = tmp_path / f"{video_path.name}.docx"

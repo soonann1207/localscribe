@@ -1,9 +1,10 @@
+import json
 import queue
 import shutil
 import threading
 import time
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Callable, Literal
 
@@ -18,6 +19,22 @@ class Job:
     output_path: Path | None = None
     error: str | None = None
     submitted_at: float = field(default_factory=time.time)
+
+    def to_dict(self) -> dict:
+        d = asdict(self)
+        d["output_path"] = str(self.output_path) if self.output_path else None
+        return d
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "Job":
+        return cls(
+            id=d["id"],
+            video_name=d["video_name"],
+            status=d["status"],
+            output_path=Path(d["output_path"]) if d["output_path"] else None,
+            error=d["error"],
+            submitted_at=d["submitted_at"],
+        )
 
 
 class JobQueue:
@@ -37,11 +54,30 @@ class JobQueue:
         self._max_active = max_active
         self._workdir = workdir or Path("job_queue_workdir")
         self._workdir.mkdir(parents=True, exist_ok=True)
+        self._jobs_file = self._workdir / "jobs.json"
         self._jobs: dict[str, Job] = {}
         self._pending: dict[str, tuple] = {}
         self._lock = threading.Lock()
         self._task_queue: queue.Queue = queue.Queue()
+        self._load_jobs()
         threading.Thread(target=self._worker_loop, daemon=True).start()
+
+    def _load_jobs(self) -> None:
+        if not self._jobs_file.exists():
+            return
+        for raw in json.loads(self._jobs_file.read_text()):
+            job = Job.from_dict(raw)
+            if job.status in ("queued", "processing"):
+                # The worker thread that owned this job is gone (process
+                # restarted mid-job) - it can't be resumed, so surface it
+                # as failed rather than silently hanging forever.
+                job.status = "error"
+                job.error = "interrupted by server restart"
+            self._jobs[job.id] = job
+        self._save_jobs()
+
+    def _save_jobs(self) -> None:
+        self._jobs_file.write_text(json.dumps([j.to_dict() for j in self._jobs.values()], indent=2))
 
     def submit(
         self,
@@ -58,6 +94,7 @@ class JobQueue:
             job_id = str(uuid.uuid4())
             self._jobs[job_id] = Job(id=job_id, video_name=video_name, status="queued")
             self._pending[job_id] = (video_path, template_path, interval_minutes, speed_factor)
+            self._save_jobs()
         self._task_queue.put(job_id)
         return job_id
 
@@ -67,6 +104,7 @@ class JobQueue:
             with self._lock:
                 video_path, template_path, interval_minutes, speed_factor = self._pending.pop(job_id)
                 self._jobs[job_id].status = "processing"
+                self._save_jobs()
             try:
                 result_path = self._run_fn(video_path, template_path, interval_minutes, speed_factor)
                 stable_output = self._workdir / f"{job_id}_{Path(result_path).name}"
@@ -74,10 +112,12 @@ class JobQueue:
                 with self._lock:
                     self._jobs[job_id].status = "done"
                     self._jobs[job_id].output_path = stable_output
+                    self._save_jobs()
             except Exception as e:  # noqa: BLE001 - job errors are reported, not raised
                 with self._lock:
                     self._jobs[job_id].status = "error"
                     self._jobs[job_id].error = str(e)
+                    self._save_jobs()
             finally:
                 video_path.unlink(missing_ok=True)
 

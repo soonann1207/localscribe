@@ -40,7 +40,9 @@ if problems:
 def get_job_queue() -> JobQueue:
     # Shared across every session connected to this app instance (this is
     # the "shared resource" case for st.cache_resource, not per-user state).
-    workdir = Path(tempfile.gettempdir()) / "localscribe_job_queue"
+    # Project-relative, not system temp: outputs and jobs.json need to
+    # survive across app restarts, and macOS periodically sweeps /tmp.
+    workdir = Path(__file__).parent / "job_queue_data"
     return JobQueue(run_fn=run_interval_transcript, max_active=MAX_ACTIVE_JOBS, workdir=workdir)
 
 
