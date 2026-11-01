@@ -1,0 +1,23 @@
+services:
+  localscribe:
+    build:
+      context: .
+      args:
+        TORCH_VARIANT: cpu   # set to "default" for the CUDA-enabled torch from uv.lock
+    image: localscribe:latest
+    ports:
+      # LAN access like the old Streamlit app. Use "127.0.0.1:8000:8000"
+      # to restrict it to this machine (there is no login).
+      - "8000:8000"
+    environment:
+      HF_TOKEN: ${HF_TOKEN:?set HF_TOKEN in .env (see .env.example)}
+      LOCALSCRIBE_MAX_ACTIVE_JOBS: ${LOCALSCRIBE_MAX_ACTIVE_JOBS:-5}
+      LOCALSCRIBE_MAX_UPLOAD_MB: ${LOCALSCRIBE_MAX_UPLOAD_MB:-2048}
+    volumes:
+      - localscribe-data:/data       # job history + transcripts
+      - localscribe-models:/models   # whisper / pyannote model cache (GBs; downloaded on first job)
+    restart: unless-stopped
+
+volumes:
+  localscribe-data:
+  localscribe-models:
