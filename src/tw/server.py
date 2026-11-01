@@ -316,6 +316,12 @@ def create_app(
 def main() -> None:
     import uvicorn
 
+    # Multipart uploads are spooled to the temp dir before we stream them to
+    # data_dir; make sure a configured TMPDIR (e.g. on the Docker volume) exists.
+    if tmpdir := os.environ.get("TMPDIR"):
+        Path(tmpdir).mkdir(parents=True, exist_ok=True)
+        tempfile.tempdir = None  # re-resolve now that it exists
+
     uvicorn.run(
         "tw.server:create_app",
         factory=True,
