@@ -31,9 +31,10 @@ tests/fixtures/*.mp4
 # subagent-driven-development workspace
 .superpowers/
 
-# local Claude Code tool/skill state
+# local Claude Code tool/skill state (shared project settings are committed)
 .agents/
-.claude/
+.claude/*
+!.claude/settings.json
 
 # job queue state + output transcripts (personal content, not shipped code)
 job_queue_data/
