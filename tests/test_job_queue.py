@@ -193,3 +193,104 @@ def test_list_jobs_returns_all_submitted_jobs(tmp_path):
     jobs = q.list_jobs()
     assert any(j.id == job_id for j in jobs)
     assert next(j for j in jobs if j.id == job_id).video_name == "video.mp4"
+
+
+def _fake_run_factory(tmp_path):
+    def fake_run(video_path, template_path, interval_minutes, speed_factor):
+        output = video_path.with_name("result.docx")
+        output.write_text("fake result")
+        return output
+
+    return fake_run
+
+
+def test_cleanup_dir_removed_after_job(tmp_path):
+    q = JobQueue(run_fn=_fake_run_factory(tmp_path), workdir=tmp_path / "workdir")
+    job_dir = tmp_path / "upload_1"
+    job_dir.mkdir()
+    video_path = job_dir / "video.mp4"
+    video_path.write_bytes(b"fake")
+
+    job_id = q.submit(video_path, "video.mp4", Path("t.docx"), 5.0, 1.0, cleanup_dir=job_dir)
+
+    assert _wait_for(lambda: q.get_job(job_id).status == "done")
+    assert _wait_for(lambda: not job_dir.exists())
+    assert q.get_job(job_id).output_path.read_text() == "fake result"
+
+
+def test_speaker_names_persist_across_restart(tmp_path):
+    workdir = tmp_path / "workdir"
+    q1 = JobQueue(run_fn=_fake_run_factory(tmp_path), workdir=workdir)
+    video_path = tmp_path / "video.mp4"
+    video_path.write_bytes(b"fake")
+    job_id = q1.submit(video_path, "video.mp4", Path("t.docx"), 5.0, 1.0)
+    assert _wait_for(lambda: q1.get_job(job_id).status == "done")
+
+    renamed = tmp_path / "renamed.docx"
+    renamed.write_text("renamed")
+    q1.update_job(job_id, speaker_names={"SPEAKER_00": "Mom"}, working_output_path=renamed)
+
+    q2 = JobQueue(run_fn=_fake_run_factory(tmp_path), workdir=workdir)
+    job = q2.get_job(job_id)
+    assert job.speaker_names == {"SPEAKER_00": "Mom"}
+    assert job.deliverable_path == renamed
+
+
+def test_delete_job_removes_outputs(tmp_path):
+    q = JobQueue(run_fn=_fake_run_factory(tmp_path), workdir=tmp_path / "workdir")
+    video_path = tmp_path / "video.mp4"
+    video_path.write_bytes(b"fake")
+    job_id = q.submit(video_path, "video.mp4", Path("t.docx"), 5.0, 1.0)
+    assert _wait_for(lambda: q.get_job(job_id).status == "done")
+    output = q.get_job(job_id).output_path
+
+    q.delete_job(job_id)
+
+    assert not output.exists()
+    assert all(j.id != job_id for j in q.list_jobs())
+
+
+def test_corrupt_jobs_file_is_set_aside(tmp_path):
+    workdir = tmp_path / "workdir"
+    workdir.mkdir()
+    (workdir / "jobs.json").write_text("{not json")
+
+    q = JobQueue(run_fn=_fake_run_factory(tmp_path), workdir=workdir)
+
+    assert q.list_jobs() == []
+    assert (workdir / "jobs.json.corrupt").exists()
+
+
+def test_on_idle_called_when_queue_drains(tmp_path):
+    calls = []
+    q = JobQueue(run_fn=_fake_run_factory(tmp_path), workdir=tmp_path / "workdir", on_idle=lambda: calls.append(1))
+    video_path = tmp_path / "video.mp4"
+    video_path.write_bytes(b"fake")
+    job_id = q.submit(video_path, "video.mp4", Path("t.docx"), 5.0, 1.0)
+    assert _wait_for(lambda: q.get_job(job_id).status == "done")
+    assert _wait_for(lambda: calls == [1])
+
+
+def test_on_idle_failure_does_not_kill_worker(tmp_path):
+    def boom():
+        raise RuntimeError("nope")
+
+    q = JobQueue(run_fn=_fake_run_factory(tmp_path), workdir=tmp_path / "workdir", on_idle=boom)
+    for i in range(2):
+        d = tmp_path / f"d{i}"
+        d.mkdir()
+        v = d / "video.mp4"
+        v.write_bytes(b"fake")
+        job_id = q.submit(v, "video.mp4", Path("t.docx"), 5.0, 1.0)
+        assert _wait_for(lambda: q.get_job(job_id).status == "done")
+
+
+def test_legacy_renamed_output_path_key_still_loads(tmp_path):
+    workdir = tmp_path / "workdir"
+    workdir.mkdir()
+    (workdir / "jobs.json").write_text(
+        '[{"id": "a", "video_name": "v.mp4", "status": "done", "output_path": null, '
+        '"error": null, "submitted_at": 1.0, "renamed_output_path": "/x/a_renamed.docx"}]'
+    )
+    q = JobQueue(run_fn=_fake_run_factory(tmp_path), workdir=workdir)
+    assert str(q.get_job("a").working_output_path) == "/x/a_renamed.docx"

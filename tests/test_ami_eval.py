@@ -1,18 +1,28 @@
+import importlib.util
+
+import pytest
 from pyannote.core import Annotation, Segment
 
 from tw.ami_eval import build_hypothesis_annotation, build_reference_annotation, compute_der, compute_wer
 from tw.types import SpeakerSegment
 
+requires_jiwer = pytest.mark.skipif(
+    importlib.util.find_spec("jiwer") is None, reason="jiwer is in the 'eval' extra (uv sync --extra eval)"
+)
 
+
+@requires_jiwer
 def test_compute_wer_identical_strings_is_zero():
     assert compute_wer("hello there world", "hello there world") == 0.0
 
 
+@requires_jiwer
 def test_compute_wer_counts_substitutions():
     wer = compute_wer("hello there world", "hello there earth")
     assert wer > 0.0
 
 
+@requires_jiwer
 def test_compute_wer_ignores_case_and_punctuation():
     reference = "HELLO THERE WORLD"
     hypothesis = "Hello, there world."

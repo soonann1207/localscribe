@@ -73,3 +73,50 @@ def test_rename_speakers_in_docx_paragraph(tmp_path):
 
     result = Document(output)
     assert result.paragraphs[0].text == "[Mom] hi there"
+
+
+def test_rename_handles_tag_split_across_runs(tmp_path):
+    from tw.speaker_rename import rename_speakers_in_file
+
+    doc = Document()
+    p = doc.add_paragraph()
+    p.add_run("[SPEAKER")
+    p.add_run("_00] hello")
+    src = tmp_path / "split.docx"
+    doc.save(src)
+    out = tmp_path / "split_renamed.docx"
+
+    rename_speakers_in_file(src, {"SPEAKER_00": "Mom"}, out)
+
+    assert Document(out).paragraphs[0].text == "[Mom] hello"
+
+
+def test_rename_preserves_cell_run_formatting(tmp_path):
+    from tw.speaker_rename import rename_speakers_in_file
+
+    doc = Document()
+    cell = doc.add_table(rows=1, cols=1).rows[0].cells[0]
+    run = cell.paragraphs[0].add_run("[SPEAKER_00] hi")
+    run.bold = True
+    src = tmp_path / "fmt.docx"
+    doc.save(src)
+    out = tmp_path / "fmt_renamed.docx"
+
+    rename_speakers_in_file(src, {"SPEAKER_00": "Mom"}, out)
+
+    renamed_run = Document(out).tables[0].rows[0].cells[0].paragraphs[0].runs[0]
+    assert renamed_run.text == "[Mom] hi"
+    assert renamed_run.bold is True
+
+
+def test_clean_speaker_name_strips_brackets_and_whitespace():
+    from tw.speaker_rename import clean_speaker_name
+
+    assert clean_speaker_name("  [Dr.]  Smith ") == "Dr. Smith"
+
+
+def test_rename_tags_in_text_handles_arbitrary_names_and_swaps():
+    from tw.speaker_rename import rename_tags_in_text
+
+    text = "[Mom] hi\n\n[Dad] hey\n\n[Mommy] yo"
+    assert rename_tags_in_text(text, {"Mom": "Dad", "Dad": "Mom"}) == "[Dad] hi\n\n[Mom] hey\n\n[Mommy] yo"

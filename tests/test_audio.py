@@ -59,3 +59,18 @@ def test_extract_audio_speed_factor_halves_duration(tmp_path):
         fast_duration = f.getnframes() / f.getframerate()
 
     assert fast_duration == pytest.approx(normal_duration / 2, abs=0.1)
+
+
+@requires_ffmpeg
+def test_extract_audio_reports_unreadable_input(tmp_path):
+    bogus = tmp_path / "broken.mp4"
+    bogus.write_bytes(b"this is not a video")
+
+    with pytest.raises(RuntimeError, match="ffmpeg could not read broken.mp4"):
+        extract_audio(bogus)
+
+
+def test_release_models_is_safe_when_nothing_loaded():
+    from tw.interval_transcript import release_models
+
+    release_models()  # must not import faster-whisper/pyannote or raise

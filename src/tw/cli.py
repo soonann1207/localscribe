@@ -19,19 +19,30 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def preflight_check() -> list[str]:
+def preflight_check(require_ollama: bool = True) -> list[str]:
+    """Return human-readable problems that would make a pipeline run fail.
+
+    The interval-transcript pipeline (web UI) never calls the LLM, so it
+    passes require_ollama=False; the field-extraction CLI needs Ollama.
+    """
     problems = []
     if shutil.which("ffmpeg") is None:
-        problems.append("ffmpeg not found on PATH (brew install ffmpeg)")
-    if shutil.which("ollama") is None:
-        problems.append("ollama not found on PATH")
-    else:
-        result = subprocess.run(["ollama", "list"], capture_output=True, text=True)
-        if "llama3.1:8b" not in result.stdout:
-            problems.append("llama3.1:8b model not pulled (ollama pull llama3.1:8b)")
+        problems.append("ffmpeg not found on PATH (brew install ffmpeg / apt install ffmpeg)")
+    if require_ollama:
+        if shutil.which("ollama") is None:
+            problems.append("ollama not found on PATH")
+        else:
+            try:
+                result = subprocess.run(["ollama", "list"], capture_output=True, text=True, timeout=15)
+            except (OSError, subprocess.SubprocessError) as e:
+                problems.append(f"could not run `ollama list`: {e}")
+            else:
+                if "llama3.1:8b" not in result.stdout:
+                    problems.append("llama3.1:8b model not pulled (ollama pull llama3.1:8b)")
     if not os.environ.get("HF_TOKEN"):
         problems.append(
-            "HF_TOKEN not set (required for pyannote diarization — see design spec Task 8 setup notes)"
+            "HF_TOKEN not set (required for pyannote diarization — accept the "
+            "pyannote/speaker-diarization-3.1 license on Hugging Face, then export HF_TOKEN)"
         )
     return problems
 

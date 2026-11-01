@@ -40,6 +40,28 @@ def fill_interval_table(template_path: Path, buckets: dict[int, str], output_pat
     return output_path
 
 
+def release_models() -> None:
+    """Free the cached Whisper and pyannote models and return the memory to
+    the OS. Called by the job queue whenever it goes idle: models stay warm
+    for back-to-back jobs, but an idle server drops back to baseline RSS
+    instead of holding ~2GB of weights indefinitely."""
+    import ctypes
+    import gc
+    import sys
+
+    from tw.diarize import release_pipeline
+    from tw.transcribe import release_model
+
+    release_model()
+    release_pipeline()
+    gc.collect()
+    if sys.platform.startswith("linux"):
+        try:  # glibc keeps freed arenas mapped; hand them back to the OS
+            ctypes.CDLL("libc.so.6").malloc_trim(0)
+        except (OSError, AttributeError):
+            pass
+
+
 def run(video_path: Path, template_path: Path, interval_minutes: float = 5.0, speed_factor: float = 1.0) -> Path:
     # Local imports: keeps this module importable (and its pure fill_interval_table
     # testable) without faster-whisper/pyannote/ffmpeg installed.
@@ -50,17 +72,22 @@ def run(video_path: Path, template_path: Path, interval_minutes: float = 5.0, sp
     from tw.types import rescale_segment_times
 
     audio_path = extract_audio(video_path, speed_factor=speed_factor)
-    transcript = transcribe(audio_path)
-    speakers = diarize(audio_path, os.environ["HF_TOKEN"])
+    try:
+        transcript = transcribe(audio_path)
+        speakers = diarize(audio_path, os.environ["HF_TOKEN"])
+    finally:
+        audio_path.unlink(missing_ok=True)  # intermediate only; can be hundreds of MB
     transcript = rescale_segment_times(transcript, speed_factor)
     speakers = rescale_segment_times(speakers, speed_factor)
     labeled = align(transcript, speakers)
 
     buckets = bucket_by_interval(labeled, interval_seconds=interval_minutes * 60)
 
-    output_path = template_path.with_name(template_path.stem + "_filled.docx")
+    # Write next to the input recording (a per-job working dir), never next to
+    # the shared template: that would put user content into templates/ and
+    # make concurrent runs clobber each other's output.
+    output_path = video_path.with_name(video_path.stem + "_filled.docx")
     return fill_interval_table(template_path, buckets, output_path)
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
