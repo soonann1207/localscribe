@@ -73,7 +73,7 @@ Evaluation helpers
 
 ## Invariants
 
-- `align.align`: the speaker with the largest overlap wins. Overlap must be strictly greater than the current best, so ties go to the first speaker. A segment with no positive overlap is labeled `UNKNOWN`.
+- `align.align`: the speaker with the largest overlap wins. Overlap must be strictly greater than the current best, so ties go to the speaker listed first. It is implemented as a sorted sweep and matches the all-pairs definition exactly. A segment with no positive overlap is labeled `UNKNOWN`.
 - `align.format_transcript`: consecutive same-speaker segments merge into one turn, formatted `[HH:MM:SS] [speaker] text`, with turns separated by a blank line. `speaker_rename._SPEAKER_TAG_RE` and transcript previews depend on this format.
 - `align.bucket_by_interval`: a segment's 1-based interval is `int(start // interval_seconds) + 1`, so it is bucketed by start time only.
 - `interval_transcript.fill_interval_table`: uses `doc.tables[0]`. Raises `ValueError` if the header has no `Transcription` column. Removes `Int N` rows that have no speech and appends rows for intervals not in the template.
@@ -97,7 +97,7 @@ Evaluation helpers
 - `transcribe.transcribe` and `diarize.diarize`: download and load models (faster-whisper `medium`; `pyannote/speaker-diarization-3.1`, gated, which needs `HF_TOKEN`).
 - `extract.call_ollama`: calls the local Ollama server.
 - `cli.preflight_check`: reads `HF_TOKEN`, checks `PATH`, and runs `ollama list`.
-- `pipeline.run` (CLI): writes `<template_stem>_filled.(md|docx)` next to the template.
+- `pipeline.run` (CLI): writes `<template_stem>_filled.(md|docx)` next to the template and deletes its intermediate WAV.
 - `transcribe` and `diarize`: keep loaded models in an `lru_cache` until `release_*()` is called.
 - `JobQueue`: creates `workdir` and `output_dir`, starts a daemon worker thread, atomically rewrites `<workdir>/jobs.json` (temp file + `os.replace`) on every state change, copies results to `<output_dir>/<job_id>_<name>`, and deletes the input video and `cleanup_dir` after each job.
 - `server`: streams uploads to `<data_dir>/uploads/job_*/` and deletes stale ones at startup. Writes working copies to `<output_dir>/<job_id>_working.docx`.

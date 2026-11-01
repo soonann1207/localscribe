@@ -6,17 +6,42 @@ def _overlap(a_start: float, a_end: float, b_start: float, b_end: float) -> floa
 
 
 def align(transcript: list[TranscriptSegment], speakers: list[SpeakerSegment]) -> list[LabeledSegment]:
-    labeled = []
-    for seg in transcript:
-        best_speaker = "UNKNOWN"
-        best_overlap = 0.0
-        for spk in speakers:
-            ov = _overlap(seg.start, seg.end, spk.start, spk.end)
-            if ov > best_overlap:  # strictly greater: first speaker wins ties
-                best_overlap = ov
-                best_speaker = spk.speaker
-        labeled.append(LabeledSegment(start=seg.start, end=seg.end, speaker=best_speaker, text=seg.text))
-    return labeled
+    """Label each transcript segment with the speaker it overlaps most.
+
+    Ties go to the speaker that comes first in `speakers`; a segment with no
+    positive overlap is "UNKNOWN". Sweep over both lists sorted by start time
+    (O((n + m) log(n + m) + n * k), k = concurrently active speaker turns)
+    instead of comparing every segment with every turn, which is millions of
+    comparisons for a multi-hour recording.
+    """
+    spk_order = sorted(range(len(speakers)), key=lambda i: speakers[i].start)
+    seg_order = sorted(range(len(transcript)), key=lambda i: transcript[i].start)
+    labels = ["UNKNOWN"] * len(transcript)
+
+    active: list[int] = []  # indices into `speakers` that may still overlap
+    next_spk = 0
+    for seg_idx in seg_order:
+        seg = transcript[seg_idx]
+        # Admit turns that start before this segment ends ...
+        while next_spk < len(spk_order) and speakers[spk_order[next_spk]].start < seg.end:
+            active.append(spk_order[next_spk])
+            next_spk += 1
+        # ... and drop turns that ended before it starts: segments are visited
+        # in start order, so those can't overlap any later segment either.
+        active = [k for k in active if speakers[k].end > seg.start]
+
+        best_overlap, best_index = 0.0, None
+        for k in active:
+            ov = _overlap(seg.start, seg.end, speakers[k].start, speakers[k].end)
+            if ov > best_overlap or (ov == best_overlap and best_index is not None and k < best_index):
+                best_overlap, best_index = ov, k
+        if best_index is not None:
+            labels[seg_idx] = speakers[best_index].speaker
+
+    return [
+        LabeledSegment(start=seg.start, end=seg.end, speaker=label, text=seg.text)
+        for seg, label in zip(transcript, labels)
+    ]
 
 
 def _format_timestamp(seconds: float) -> str:

@@ -19,8 +19,11 @@ def run(video_path: Path, template_path: Path, speed_factor: float = 1.0) -> Pat
         raise ValueError(f"template has no headings/fields: {template_path}")
 
     audio_path = extract_audio(video_path, speed_factor=speed_factor)
-    transcript = transcribe(audio_path)
-    speakers = diarize(audio_path, os.environ["HF_TOKEN"])
+    try:
+        transcript = transcribe(audio_path)
+        speakers = diarize(audio_path, os.environ["HF_TOKEN"])
+    finally:
+        audio_path.unlink(missing_ok=True)  # don't leave a large .wav next to the user's video
     transcript = rescale_segment_times(transcript, speed_factor)
     speakers = rescale_segment_times(speakers, speed_factor)
     labeled = align(transcript, speakers)

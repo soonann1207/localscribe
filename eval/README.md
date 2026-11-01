@@ -23,7 +23,7 @@ public meeting datasets. They are not used by the app at runtime.
 - `fetch_meeting_rows`: raises `ValueError` if no rows match the meeting. Keeps only rows that end within `max_seconds` of the meeting's first utterance.
 - `reconstruct_audio`: overlapping utterances are laid end to end, never padded. The sample rate is taken from the first row.
 - `run_ami_eval.run_eval`: reads `HF_TOKEN` with no fallback. DER is computed against the re-timed rows.
-- `run_qmsum_eval.run_eval`: a missing field is scored as `[NOT EXTRACTED]`. Raises `ZeroDivisionError` when no fields are found.
+- `run_qmsum_eval.run_eval`: a missing field is scored as `[NOT EXTRACTED]`. Prints a notice and skips scoring when no fields are found. `--save-details` creates its parent folder.
 
 ## Side Effects
 

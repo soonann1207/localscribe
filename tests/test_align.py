@@ -120,3 +120,42 @@ def test_bucket_by_interval_renders_each_bucket_like_format_transcript():
     segments = [LabeledSegment(start=0.0, end=1.0, speaker="SPEAKER_00", text="hello")]
     buckets = bucket_by_interval(segments, interval_seconds=300.0)
     assert buckets[1] == format_transcript(segments)
+
+
+def _naive_align(transcript, speakers):
+    out = []
+    for seg in transcript:
+        best_speaker, best = "UNKNOWN", 0.0
+        for spk in speakers:
+            ov = max(0.0, min(seg.end, spk.end) - max(seg.start, spk.start))
+            if ov > best:
+                best, best_speaker = ov, spk.speaker
+        out.append(best_speaker)
+    return out
+
+
+def test_align_matches_naive_reference_on_random_inputs():
+    import random
+
+    rng = random.Random(1234)
+    for _ in range(300):
+        transcript = []
+        for _ in range(rng.randint(0, 25)):
+            start = rng.choice([rng.uniform(0, 60), float(rng.randint(0, 60))])
+            transcript.append(TranscriptSegment(start=start, end=start + rng.choice([0.0, 1.0, rng.uniform(0, 8)]), text="x"))
+        speakers = []
+        for _ in range(rng.randint(0, 20)):
+            start = rng.choice([rng.uniform(0, 60), float(rng.randint(0, 60))])
+            speakers.append(
+                SpeakerSegment(start=start, end=start + rng.choice([1.0, rng.uniform(0, 30)]), speaker=f"S{rng.randint(0, 3)}")
+            )
+        assert [s.speaker for s in align(transcript, speakers)] == _naive_align(transcript, speakers)
+
+
+def test_align_tie_goes_to_first_listed_speaker_even_if_it_starts_later():
+    transcript = [TranscriptSegment(start=0.0, end=4.0, text="t")]
+    speakers = [
+        SpeakerSegment(start=2.0, end=4.0, speaker="LISTED_FIRST"),
+        SpeakerSegment(start=0.0, end=2.0, speaker="STARTS_FIRST"),
+    ]
+    assert align(transcript, speakers)[0].speaker == "LISTED_FIRST"

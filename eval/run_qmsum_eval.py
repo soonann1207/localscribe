@@ -60,11 +60,15 @@ def run_eval(data_dir: Path, limit: int, details_path: Path | None) -> None:
             )
 
     print(f"\n=== Summary: {total} fields evaluated ===")
+    if total == 0:
+        print(f"No queries found in {data_dir} (limit={limit}); nothing to score.")
+        return
     print(f"MATCH: {matched} ({matched / total:.0%})")
     print(f"PARTIAL: {partial} ({partial / total:.0%})")
     print(f"MISMATCH: {mismatched} ({mismatched / total:.0%})")
 
     if details_path:
+        details_path.parent.mkdir(parents=True, exist_ok=True)
         details_path.write_text(json.dumps(details, indent=2))
         print(f"\nPer-field details written to {details_path}")
 
