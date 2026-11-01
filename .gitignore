@@ -38,3 +38,7 @@ tests/fixtures/*.mp4
 # job queue state + output transcripts (personal content, not shipped code)
 job_queue_data/
 outputs/
+uploads/
+
+# sandbox-only build helper
+.sandbox-ca.crt
